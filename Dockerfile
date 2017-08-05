@@ -1,4 +1,4 @@
-FROM registry-vpc.cn-shenzhen.aliyuncs.com/zhouqi/nginx:1.4
+FROM registry.cn-shenzhen.aliyuncs.com/zhouqi/nginx:v1.4
 
 ADD /bin/consul-template /usr/local/bin/consul-template
 
