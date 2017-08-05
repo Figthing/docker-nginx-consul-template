@@ -26,7 +26,8 @@ http {
 		upstream {{ $name }} {
 
 			{{ range $service := service $services.Name }} {{ if eq $service.Port 80 }}
-				{{ scratch.MapSet "$name" "$service.Address" $service.Address }}
+                                {{ $key := $service.Address | base64Encode }}
+                                {{ scratch.MapSet "$name" $key $service.Address }}
 			{{ end }} {{ end }}
 
 			{{ range scratch.MapValues "$name" }}
