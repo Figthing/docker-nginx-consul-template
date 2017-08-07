@@ -17,50 +17,58 @@ http {
 	include /etc/nginx/http.conf;
 
 	#+--------------- constul template start ---------------+#
-	{{ range $services := services }} {{ if .Tags | contains "www" }} {{ if in .Name "80" }}
+	{{ range $services := services }} {{ if .Tags | contains "www" }}
 
-		{{ $name := $services.Name | replaceAll "_" "." | replaceAll "-80" ""}}
+		{{ range $service := service $services.Name }} 
+			{{ if or (eq $service.Port 80) (eq $service.Port 8080)}}
+				{{ $key := printf "%s:%d" $service.Address $service.Port | base64Encode }}
+				{{ $value := printf "%s:%d" $service.Address $service.Port }}
+                                {{ $name := $service.Name | base64Encode }}
+                                {{ scratch.MapSet $name $key $value }}
+				{{ scratch.MapSet $name "port" $service.Port}}
+			{{ end }} 
+		{{ end }}
+	
+		{{ $key := $services.Name | base64Encode}}
 
-		{{ if $name }}
+		{{ if scratch.Get $key}}
+			{{ $name := $services.Name | replaceAll "_" "." | replaceAll "-80" ""}}
+			{{ $data := scratch.Get $key }}
 
-		upstream {{ $name }} {
-
-			{{ range $service := service $services.Name }} {{ if eq $service.Port 80 }}
-                                {{ $key := $service.Address | base64Encode }}
-                                {{ scratch.MapSet "$name" $key $service.Address }}
-			{{ end }} {{ end }}
-
-			{{ range scratch.MapValues "$name" }}
-				server {{ . }}:80 max_fails=0 fail_timeout=10s;
-			{{ end }}
-
-			keepalive 20000;
-		}
-
-		server {
-			server_name {{ $name }};
-			listen 80 ;
-			location / {
-				proxy_pass http://{{ $name }};
-				proxy_redirect             off;
-				proxy_set_header           Host $host; 
-				proxy_set_header           X-Real-IP $remote_addr; 
-				proxy_set_header           X-Forwarded-For $proxy_add_x_forwarded_for;
-				proxy_connect_timeout      300;
-				proxy_send_timeout         300;
-				proxy_read_timeout         300;
-				proxy_buffer_size          4k;
-				proxy_buffers              4 32k;
-				proxy_busy_buffers_size    64k;
-				proxy_temp_file_write_size 64k;
-				ssi off;
-				autoindex off;
+			upstream {{ $name }} {
+				{{ range $k, $item := $data }} {{ if ne $k "port" }}
+					server {{ $item }} max_fails=0 fail_timeout=10s;
+				{{ end }} {{ end }}
+				keepalive 20000;
 			}
-		}
+
+
+			server {
+                        	server_name {{ $name }};
+				listen {{ $data.port }};
+				location / {
+					proxy_pass http://{{ $name }};
+					proxy_redirect             off;
+					proxy_set_header           Host $host;
+					proxy_set_header           X-Real-IP $remote_addr;
+					proxy_set_header           X-Forwarded-For $proxy_add_x_forwarded_for;
+					proxy_connect_timeout      300;
+					proxy_send_timeout         300;
+					proxy_read_timeout         300;
+					proxy_buffer_size          4k;
+					proxy_buffers              4 32k;
+					proxy_busy_buffers_size    64k;
+					proxy_temp_file_write_size 64k;
+					ssi off;
+					autoindex off;
+				}
+                	}
 
 		{{ end }}
 
-	{{ end }} {{ end }} {{ end }}
+	{{ end }} {{ end }}
+
+
 	#+--------------- constul template end ---------------+#
 
 	include /etc/nginx/conf.d/*.conf;
