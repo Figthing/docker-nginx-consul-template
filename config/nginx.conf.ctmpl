@@ -25,7 +25,6 @@ http {
 				{{ $value := printf "%s:%d" $service.Address $service.Port }}
                                 {{ $name := $service.Name | base64Encode }}
                                 {{ scratch.MapSet $name $key $value }}
-				{{ scratch.MapSet $name "port" $service.Port}}
 			{{ end }} 
 		{{ end }}
 	
@@ -36,16 +35,16 @@ http {
 			{{ $data := scratch.Get $key }}
 
 			upstream {{ $name }} {
-				{{ range $k, $item := $data }} {{ if ne $k "port" }}
+				{{ range $k, $item := $data }}
 					server {{ $item }} max_fails=0 fail_timeout=10s;
-				{{ end }} {{ end }}
+				{{ end }}
 				keepalive 20000;
 			}
 
 
 			server {
                         	server_name {{ $name }};
-				listen {{ $data.port }};
+				listen 80;
 				location / {
 					proxy_pass http://{{ $name }};
 					proxy_redirect             off;
