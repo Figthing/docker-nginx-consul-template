@@ -17,36 +17,77 @@ http {
 	include /etc/nginx/http.conf;
 
 	#+--------------- constul template start ---------------+#
-	{{ range $services := services }} {{ if .Tags | contains "www" }}
-
-		{{ range $service := service $services.Name }} 
-			{{ if or (eq $service.Port 80) (eq $service.Port 8080)}}
-				{{ $key := printf "%s:%d" $service.Address $service.Port | base64Encode }}
-				{{ $value := printf "%s:%d" $service.Address $service.Port }}
-                                {{ $name := $service.Name | base64Encode }}
-                                {{ scratch.MapSet $name $key $value }}
-			{{ end }} 
-		{{ end }}
 	
-		{{ $key := $services.Name | base64Encode}}
+	{{ range $service := services }}
+		{{ with $tags := .Tags | join "," }}
+			{{ if $tags | contains "domain" }}
+				{{ with $obj := $tags | regexReplaceAll "(.*)" "{$1}" | parseJSON }}
+				
+					 {{ range $index, $serviceItem := service $service.Name }}
+						
+						{{ $ip := printf "%s:%d" $serviceItem.Address $serviceItem.Port }}
+						{{ $ipEncode := $ip | base64Encode }}
+						{{ $ipKey := printf "ip%d" $index }}
+						
+						{{ if $obj.dir }}
+						
+							{{ $key := printf "%s/%s" $obj.domain $obj.dir }}
+							
+							{{ if scratch.MapValues $key | contains $ip }} {{ else }}
+							
+								# save ip list
+								{{ scratch.MapSet $key $ipKey $ip }}
+									
+								# domain => dir => ip list
+								{{ $data := scratch.Get $key}}
+								{{ scratch.MapSet $obj.domain $obj.dir $data }}
+							
+							{{ end }}
+						
+						{{ else }}
+							
+							{{ $key := printf "%s/www" $obj.domain }}
+							
+							{{ if scratch.MapValues $key | contains $ip }} {{ else }}
+							
+								# save ip list
+								{{ scratch.MapSet $key $ipKey $ip }}
+									
+								# domain => dir => ip list
+								{{ $data := scratch.Get $key}}
+								{{ scratch.MapSet $obj.domain "www" $data }}
+							
+							{{ end }}
+						{{ end }}
 
-		{{ if scratch.Get $key}}
-			{{ $name := $services.Name | replaceAll "_" "." | replaceAll "-80" ""}}
-			{{ $data := scratch.Get $key }}
-
-			upstream {{ $name }} {
-				{{ range $k, $item := $data }}
-					server {{ $item }} max_fails=0 fail_timeout=10s;
+					{{ end }}
+					
+					{{ $data := scratch.Get $obj.domain }}
+					{{ scratch.MapSet "www" $obj.domain $data }}
+				{{ end }}
+			{{ end }}
+		{{ end }}
+	{{ end }}
+	
+	
+	{{ range $domain, $list := scratch.Get "www" }}
+	
+		{{ range $dir, $item := $list }}
+			upstream {{ $domain }}/{{ $dir }} {
+				{{ range $item }}
+					server {{ . }} max_fails=0 fail_timeout=10s;
 				{{ end }}
 				keepalive 20000;
 			}
-
-
-			server {
-                        	server_name {{ $name }};
-				listen 80;
-				location / {
-					proxy_pass http://{{ $name }};
+		{{ end }}
+		
+		server {
+            server_name {{ $domain }};
+			listen 80;
+			
+			{{ range $dir, $item := $list }}
+				location /{{ if ne $dir "www" }} {{ $dir }} {{ end }} {
+					proxy_pass http://{{ $domain }}/{{ $dir }};
 					proxy_redirect             off;
 					proxy_set_header           Host $host;
 					proxy_set_header           X-Real-IP $remote_addr;
@@ -61,15 +102,14 @@ http {
 					ssi off;
 					autoindex off;
 				}
-                	}
-
-		{{ end }}
-
-	{{ end }} {{ end }}
+			{{ end }}
+        }
+	{{ end }}
 
 
 	#+--------------- constul template end ---------------+#
 
 	include /etc/nginx/conf.d/*.conf;
 }
+
 
