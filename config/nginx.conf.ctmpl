@@ -87,10 +87,14 @@ http {
 			listen 80;
 			
 			{{ range $dir, $item := $list }}
-				location /{{ if ne $dir "www" }} {{ $dir }} {{ end }} {
+					{{ if ne $dir "www" }}
+						location /{{$dir}}/ {
+					{{ else }}	
+						location / {
+					{{ end }}
 				
 					# {{ printf "%s/%s" $domain $dir }}
-					proxy_pass http://{{ printf "%s/%s" $domain $dir | base64Encode }};
+					proxy_pass http://{{ printf "%s/%s" $domain $dir | base64Encode }}/;
 					proxy_redirect             off;
 					proxy_set_header           Host $host;
 					proxy_set_header           X-Real-IP $remote_addr;
