@@ -73,7 +73,8 @@ http {
 	{{ range $domain, $list := scratch.Get "www" }}
 	
 		{{ range $dir, $item := $list }}
-			upstream {{ $domain }}/{{ $dir }} {
+			# {{ printf "%s/%s" $domain $dir }}
+			upstream {{ printf "%s/%s" $domain $dir | base64Encode }} {
 				{{ range $item }}
 					server {{ . }} max_fails=0 fail_timeout=10s;
 				{{ end }}
@@ -87,7 +88,9 @@ http {
 			
 			{{ range $dir, $item := $list }}
 				location /{{ if ne $dir "www" }} {{ $dir }} {{ end }} {
-					proxy_pass http://{{ $domain }}/{{ $dir }};
+				
+					# {{ printf "%s/%s" $domain $dir }}
+					proxy_pass http://{{ printf "%s/%s" $domain $dir | base64Encode }};
 					proxy_redirect             off;
 					proxy_set_header           Host $host;
 					proxy_set_header           X-Real-IP $remote_addr;
