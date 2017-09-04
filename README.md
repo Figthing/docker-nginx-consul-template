@@ -12,7 +12,7 @@
 ```
     
     nginx-proxy：  
-    image:  
+      image:  
         registry.cn-shenzhen.aliyuncs.com/zhouqi/consul-template:1.2 
       volumes: 
         - /htdocs/nginx-proxy/:/etc/nginx/conf.d/ 
